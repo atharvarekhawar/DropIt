@@ -1,4 +1,4 @@
-//const { exec } = require("child-process");
+const { exec } = require("child-process");
 const path = require("path");
 const fs = require("fs");
 const {S3Client,PutObjectCommand} = require("@aws-sdk/client-s3");
@@ -57,6 +57,6 @@ async function init() {
   });
 }
 
-//init();
+init();
 
 console.log(process.env.secretAccessKey);
