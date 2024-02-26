@@ -1,14 +1,15 @@
-const { exec } = require("child-process");
+//const { exec } = require("child-process");
 const path = require("path");
 const fs = require("fs");
 const {S3Client,PutObjectCommand} = require("@aws-sdk/client-s3");
 const mime = require('mime-types');
+require('dotenv').config()
 
 const s3Client = new S3Client({
     region: 'ap-south-1',
     credentials: {
-        accessKeyId: 'AKIASGPQ6DS3V7KTVU2N',
-        secretAccessKey: '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'
+        accessKeyId: process.env.accessKeyId,
+        secretAccessKey: process.env.secretAccessKey,
     }
 });
 
@@ -16,7 +17,7 @@ const PROJECT_ID = process.env.PROJECT_ID;
 
 
 async function init() {
-  console.log("Executing script.js");
+  console.log("Executing script.js");console.log(process.env.accessKeyId);
   const outDirPath = path.join(__dirname, "output");
 
   const p = exec(`cd ${outDirPath} && npm install && npm run build`);
@@ -56,4 +57,6 @@ async function init() {
   });
 }
 
-init();
+//init();
+
+console.log(process.env.secretAccessKey);
