@@ -1,15 +1,14 @@
-const { exec } = require("child-process");
+const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const {S3Client,PutObjectCommand} = require("@aws-sdk/client-s3");
 const mime = require('mime-types');
-require('dotenv').config()
 
 const s3Client = new S3Client({
     region: 'ap-south-1',
     credentials: {
-        accessKeyId: process.env.accessKeyId,
-        secretAccessKey: process.env.secretAccessKey,
+        accessKeyId: 'AKIASGPQ6DS3V7KTVU2N',
+        secretAccessKey:'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',
     }
 });
 
@@ -17,7 +16,7 @@ const PROJECT_ID = process.env.PROJECT_ID;
 
 
 async function init() {
-  console.log("Executing script.js");console.log(process.env.accessKeyId);
+  console.log("Executing script.js");
   const outDirPath = path.join(__dirname, "output");
 
   const p = exec(`cd ${outDirPath} && npm install && npm run build`);
@@ -36,7 +35,8 @@ async function init() {
       recursive: true,
     });
 
-    for(const filePath of distFolderContents) {
+    for(const file of distFolderContents) {
+      const filePath = path.join(distFolderPath, file)
         //only path to files are uploaded to s3 not directories
         if(fs.lstatSync(filePath).isDirectory()) continue;
 
@@ -44,7 +44,7 @@ async function init() {
 
         const command = new PutObjectCommand({
             Bucket: 'vercel-clone-outputs-bucket',
-            Key: `__outputs/${PROJECT_ID}/${filePath}`,
+            Key: `__outputs/${PROJECT_ID}/${file}`,
             Body: fs.createReadStream(filePath),
             ContentType: mime.lookup(filePath)
         });
@@ -58,5 +58,3 @@ async function init() {
 }
 
 init();
-
-console.log(process.env.secretAccessKey);
