@@ -7,8 +7,8 @@ const mime = require('mime-types');
 const s3Client = new S3Client({
     region: 'ap-south-1',
     credentials: {
-        accessKeyId: 'AKIASGPQ6DS3V7KTVU2N',
-        secretAccessKey:'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',
+        accessKeyId: '',
+        secretAccessKey:'',
     }
 });
 
