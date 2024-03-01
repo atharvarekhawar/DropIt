@@ -8,7 +8,7 @@ const Redis = require('ioredis');
 require('dotenv').config()
 
 
-const publisher = new Redis('rediss://default:AVNS_k4EUkW1EogIhFaF-7Hc@vercel-clone-logs-formhub.a.aivencloud.com:26867');
+const publisher = new Redis(process.env.REDIS_URL);
 
 const s3Client = new S3Client({
     region: 'ap-south-1',

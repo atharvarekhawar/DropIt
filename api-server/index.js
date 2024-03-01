@@ -8,9 +8,7 @@ require('dotenv').config();
 const app = express();
 const PORT = 9000;
 
-const subscriber = new Redis(
-  "rediss://default:AVNS_k4EUkW1EogIhFaF-7Hc@vercel-clone-logs-formhub.a.aivencloud.com:26867"
-);
+const subscriber = new Redis(process.env.REDIS_URL);
 
 const io = new Server({ cors: "*" });
 io.listen(9001, () => {
