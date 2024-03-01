@@ -1,15 +1,34 @@
 const express = require("express");
 const { generateSlug } = require("random-word-slugs");
 const { ECSClient, RunTaskCommand } = require("@aws-sdk/client-ecs");
+const { Server } = require("socket.io");
+const Redis = require("ioredis");
+require('dotenv').config();
 
 const app = express();
 const PORT = 9000;
 
+const subscriber = new Redis(
+  "rediss://default:AVNS_k4EUkW1EogIhFaF-7Hc@vercel-clone-logs-formhub.a.aivencloud.com:26867"
+);
+
+const io = new Server({ cors: "*" });
+io.listen(9001, () => {
+  console.log("Socket server 9001");
+});
+
+io.on("connection", (socket) => {
+  socket.on("subscribe", (channel) => {
+    socket.join(channel);
+    socket.emit("message", `joined ${channel}`);
+  });
+});
+
 const ecsClient = new ECSClient({
   region: "ap-south-1",
   credentials: {
-    accessKeyId: "",
-    secretAccessKey: "",
+    accessKeyId: process.env.accessKeyId,
+    secretAccessKey: process.env.secretAccessKey,
   },
 });
 
@@ -63,6 +82,16 @@ app.post("/project", async (req, res) => {
     },
   });
 });
+
+function initRedisSubscribe(){
+  console.log('Subscribed to logs...');
+  subscriber.psubscribe('logs:*');
+  subscriber.on('pmessage',(pattern,channel,message)=>{
+    io.to(channel).emit('message',message);
+  })
+}
+
+initRedisSubscribe();
 
 app.listen(PORT, () => {
   console.log(`api server listening on ${PORT}`);
