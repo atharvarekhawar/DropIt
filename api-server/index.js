@@ -3,10 +3,15 @@ const { generateSlug } = require("random-word-slugs");
 const { ECSClient, RunTaskCommand } = require("@aws-sdk/client-ecs");
 const { Server } = require("socket.io");
 const Redis = require("ioredis");
-require('dotenv').config();
+const { z } = require("zod");
+const { PrismaClient } = require("@prisma/client");
+
+require("dotenv").config();
 
 const app = express();
 const PORT = 9000;
+
+const prisma = new PrismaClient({});
 
 const subscriber = new Redis(process.env.REDIS_URL);
 
@@ -38,8 +43,56 @@ const config = {
 app.use(express.json());
 
 app.post("/project", async (req, res) => {
-  const { gitUrl } = req.body;
-  const projectSlug = generateSlug();
+  const schema = z.object({
+    name: z.string(),
+    gitUrl: z.string().min(1),
+  });
+
+  const safeParseResult = schema.safeParse(req.body);
+
+  if (safeParseResult.error) {
+    return res.status(400).json({
+      error: safeParseResult.error,
+    });
+  }
+
+  const { name, gitUrl } = safeParseResult.data;
+
+  const project = await prisma.project.create({
+    data: {
+      name,
+      gitUrl,
+      subDomain: generateSlug(),
+    },
+  });
+
+  return res.status(200).json({
+    status: "success",
+    data: { project },
+  });
+});
+
+app.post("/deploy", async (req, res) => {
+  const { projectId } = req.body;
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+  });
+
+  if (!project) {
+    return res.status(404).json({
+      error: "Project not found",
+    });
+  }
+
+  const deployment = await prisma.deployment.create({
+    data: {
+      project: { connect: { id: projectId } },
+      status: "QUEUED",
+    },
+  });
 
   const command = new RunTaskCommand({
     cluster: config.CLUSTER,
@@ -62,8 +115,9 @@ app.post("/project", async (req, res) => {
         {
           name: "build-server-image",
           environment: [
-            { name: "GIT_REPOSITORY_URL", value: gitUrl },
-            { name: "PROJECT_ID", value: projectSlug },
+            { name: "GIT_REPOSITORY_URL", value: project.gitUrl },
+            { name: "PROJECT_ID", value: projectId },
+            { name: "DEPLOYMENT_ID", value: deployment.id },
           ],
         },
       ],
@@ -75,18 +129,17 @@ app.post("/project", async (req, res) => {
   return res.json({
     status: "queued",
     data: {
-      projectSlug,
-      url: `http://${projectSlug}.localhost:8000`,
+      data: { deploymentId: deployment.id },
     },
   });
 });
 
-function initRedisSubscribe(){
-  console.log('Subscribed to logs...');
-  subscriber.psubscribe('logs:*');
-  subscriber.on('pmessage',(pattern,channel,message)=>{
-    io.to(channel).emit('message',message);
-  })
+function initRedisSubscribe() {
+  console.log("Subscribed to logs...");
+  subscriber.psubscribe("logs:*");
+  subscriber.on("pmessage", (pattern, channel, message) => {
+    io.to(channel).emit("message", message);
+  });
 }
 
 initRedisSubscribe();
