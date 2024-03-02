@@ -7,7 +7,7 @@ import { Github } from "lucide-react";
 import { Fira_Code } from "next/font/google";
 import axios from "axios";
 
-const socket = io("http://localhost:9002");
+const socket = io("http://localhost:9001");
 
 const firaCode = Fira_Code({ subsets: ["latin"] });
 
