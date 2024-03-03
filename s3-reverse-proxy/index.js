@@ -1,5 +1,6 @@
 const express = require('express');
 const httpProxy = require('http-proxy');
+const { PrismaClient } = require("@prisma/client");
 
 const app = express();
 const PORT = 8000;
@@ -7,12 +8,19 @@ const PORT = 8000;
 const BASE_PATH = "https://vercel-clone-outputs-bucket.s3.ap-south-1.amazonaws.com/__outputs";
 
 const proxy = httpProxy.createProxy();
+const prisma = new PrismaClient({});
 
-app.use((req, res) => {
+app.use(async (req, res) => {
   const hostname = req.hostname;
   const subdomain = hostname.split(".")[0];
 
-  const resolvesTo = `${BASE_PATH}/${subdomain}`;
+  const project = await prisma.project.findFirst({
+    where: {
+      subDomain: subdomain,
+    }
+  })
+
+  const resolvesTo = `${BASE_PATH}/${project.id}`;
 
   return proxy.web(req, res, { target: resolvesTo, changeOrigin: true });
 });
