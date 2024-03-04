@@ -1,18 +1,17 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { io } from "socket.io-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Github } from "lucide-react";
+import { FolderPen, Github } from "lucide-react";
 import { Fira_Code } from "next/font/google";
 import axios from "axios";
-
-const socket = io("http://localhost:9001");
 
 const firaCode = Fira_Code({ subsets: ["latin"] });
 
 export default function Home() {
-  const [repoURL, setURL] = useState<string>("");
+  const [projectName, setProjectName] = useState<string>("");
+  const [repoURL, setRepoUrl] = useState<string>("");
+  const [subdomain, setSubdomain] = useState<string>("");
 
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -36,20 +35,38 @@ export default function Home() {
   const handleClickDeploy = useCallback(async () => {
     setLoading(true);
 
-    const { data } = await axios.post(`http://localhost:9000/project`, {
-      gitURL: repoURL,
-      slug: projectId,
-    });
+    try {
+      const payload = {
+        name: projectName,
+        gitUrl: repoURL,
+      };
+      const { data } = await axios.post(
+        "http://localhost:9000/project",
+        payload
+      );
 
-    if (data && data.data) {
-      const { projectSlug, url } = data.data;
-      setProjectId(projectSlug);
-      setDeployPreviewURL(url);
+      if (data && data.data) {
+        setProjectId(data.data.project.id);
+        setSubdomain(data.data.project.subDomain);
+      }
 
-      console.log(`Subscribing to logs:${projectSlug}`);
-      socket.emit("subscribe", `logs:${projectSlug}`);
+      // const deploymentPayload = {
+      //   projectId: projectId,
+      // };
+
+      // const deploymentData = await axios.post("http://localhost:9000/deploy", deploymentPayload);
+
+      // if (deploymentData && deploymentData.data) {
+      //   const { deploymentId } = data.data;
+
+      //   console.log(deploymentId);
+      // }
+    } catch (error) {
+      console.error("Error occurred during POST request:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [projectId, repoURL]);
+  }, [projectName, repoURL]);
 
   const handleSocketIncommingMessage = useCallback((message: string) => {
     console.log(`[Incomming Socket Message]:`, typeof message, message);
@@ -58,31 +75,42 @@ export default function Home() {
     logContainerRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  useEffect(() => {
-    socket.on("message", handleSocketIncommingMessage);
+  // useEffect(() => {
+  //   socket.on("message", handleSocketIncommingMessage);
 
-    return () => {
-      socket.off("message", handleSocketIncommingMessage);
-    };
-  }, [handleSocketIncommingMessage]);
+  //   return () => {
+  //     socket.off("message", handleSocketIncommingMessage);
+  //   };
+  // }, [handleSocketIncommingMessage]);
 
   return (
     <main className="flex justify-center items-center h-[100vh]">
       <div className="w-[600px]">
+        <span className="flex justify-start items-center gap-2 mb-2">
+          <FolderPen className="text-5xl" />
+          <Input
+            disabled={loading}
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            type="text"
+            placeholder="Project name"
+          />
+        </span>
         <span className="flex justify-start items-center gap-2">
           <Github className="text-5xl" />
           <Input
             disabled={loading}
             value={repoURL}
-            onChange={(e) => setURL(e.target.value)}
+            onChange={(e) => setRepoUrl(e.target.value)}
             type="url"
             placeholder="Github URL"
           />
         </span>
+        <span></span>
         <Button
           onClick={handleClickDeploy}
           disabled={!isValidURL[0] || loading}
-          className="w-full mt-3"
+          className="w-full mt-3 cursor-pointer"
         >
           {loading ? "In Progress" : "Deploy"}
         </Button>

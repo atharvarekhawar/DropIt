@@ -3,12 +3,12 @@ const path = require("path");
 const fs = require("fs");
 const { generateSlug } = require("random-word-slugs");
 const { ECSClient, RunTaskCommand } = require("@aws-sdk/client-ecs");
-const { Server } = require("socket.io");
 const { z } = require("zod");
 const { PrismaClient } = require("@prisma/client");
 const { createClient } = require("@clickhouse/client");
 const { Kafka } = require("kafkajs");
 const { v4: uuidv4 } = require("uuid");
+const cors = require("cors");
 
 require("dotenv").config();
 
@@ -17,41 +17,29 @@ const PORT = 9000;
 
 const prisma = new PrismaClient({});
 
-const io = new Server({ cors: "*" });
-io.listen(9001, () => {
-  console.log("Socket server 9001");
-});
+// const kafka = new Kafka({
+//   clientId: `api-server`,
+//   brokers: ["kafka-30cb6532-formhub.a.aivencloud.com:26879"],
+//   ssl: {
+//     ca: [fs.readFileSync(path.join(__dirname, "kafka.pem"), "utf-8")],
+//   },
+//   sasl: {
+//     username: "avnadmin",
+//     password: process.env.KAFKA_PASS,
+//     mechanism: "plain",
+//   },
+// });
 
-const kafka = new Kafka({
-  clientId: `api-server`,
-  brokers: ["kafka-30cb6532-formhub.a.aivencloud.com:26879"],
-  ssl: {
-    ca: [fs.readFileSync(path.join(__dirname, "kafka.pem"), "utf-8")],
-  },
-  sasl: {
-    username: "avnadmin",
-    password: process.env.KAFKA_PASS,
-    mechanism: "plain",
-  },
-});
+// const client = createClient({
+//   host: "https://clickhouse-d4a70f6-formhub.a.aivencloud.com:26867",
+//   database: "default",
+//   username: "avnadmin",
+//   password: process.env.CLICKHOUSE_PASS,
+// });
 
-const client = createClient({
-  host: "https://clickhouse-d4a70f6-formhub.a.aivencloud.com:26867",
-  database: "default",
-  username: "avnadmin",
-  password: process.env.CLICKHOUSE_PASS,
-});
-
-const consumer = kafka.consumer({
-  groupId: "api-server-logs-consumer",
-});
-
-io.on("connection", (socket) => {
-  socket.on("subscribe", (channel) => {
-    socket.join(channel);
-    socket.emit("message", `joined ${channel}`);
-  });
-});
+// const consumer = kafka.consumer({
+//   groupId: "api-server-logs-consumer",
+// });
 
 const ecsClient = new ECSClient({
   region: "ap-south-1",
@@ -67,17 +55,23 @@ const config = {
 };
 
 app.use(express.json());
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
 app.post("/project", async (req, res) => {
   const schema = z.object({
     name: z.string(),
-    gitUrl: z.string().min(1),
+    gitUrl: z.string(),
   });
 
   const safeParseResult = schema.safeParse(req.body);
 
   if (safeParseResult.error) {
     return res.status(400).json({
+      data:"safeParseError",
       error: safeParseResult.error,
     });
   }
@@ -155,7 +149,7 @@ app.post("/deploy", async (req, res) => {
   return res.json({
     status: "queued",
     data: {
-      data: { deploymentId: deployment.id },
+      deploymentId: deployment.id,
     },
   });
 });
@@ -216,7 +210,7 @@ async function initKafkaConsumer() {
   });
 }
 
-initKafkaConsumer();
+//initKafkaConsumer();
 
 app.listen(PORT, () => {
   console.log(`api server listening on ${PORT}`);
