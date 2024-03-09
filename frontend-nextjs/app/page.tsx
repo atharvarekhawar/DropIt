@@ -18,6 +18,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   const [projectId, setProjectId] = useState<string | undefined>();
+  const [deploymentID, setDeploymentId] = useState<string | undefined>();
+
   const [deployPreviewURL, setDeployPreviewURL] = useState<
     string | undefined
   >();
@@ -31,6 +33,44 @@ export default function Home() {
     );
     return [regex.test(repoURL), "Enter valid Github Repository URL"];
   }, [repoURL]);
+
+
+  useEffect(() => {
+    const createPollingLogs = async (deploymentId: string) => {
+      const id = setInterval(async () => {
+        try {
+          const { data } = await axios.get(
+            `http://localhost:9000/logs/${deploymentId}`
+          );
+          if (data && data.data && data.data.logs) {
+            const newLogs = JSON.parse(data.data.logs);
+            console.log("logs:", newLogs);
+
+            setLogs((prevLogs) => [...prevLogs, ...newLogs]);
+            logContainerRef.current?.scrollIntoView({ behavior: "smooth" });
+          }
+        } catch (error) {
+          console.error("Error occurred while fetching logs:", error);
+        }
+      }, 5000); // Polling every 5 seconds
+
+      const timeoutId = setTimeout(() => {
+        clearInterval(id);
+        setProjectId("");
+        setDeploymentId("");
+      }, 30000);
+
+      if (projectId && projectId!=="" && deploymentID && deploymentID!=="") {
+        createPollingLogs(deploymentID);
+      }
+
+      // Cleanup function to clear timeout when component unmounts or projectId changes
+      return () => {
+        clearInterval(id);
+        clearTimeout(timeoutId);
+      };
+    };
+  }, [deploymentID, projectId]);
 
   const handleClickDeploy = useCallback(async () => {
     setLoading(true);
@@ -47,41 +87,37 @@ export default function Home() {
 
       if (data && data.data) {
         setProjectId(data.data.project.id);
+        const previewUrl = `http://${data.data.project.subDomain}.localhost:8000/`;
+        setDeployPreviewURL(previewUrl);
         setSubdomain(data.data.project.subDomain);
       }
 
-      // const deploymentPayload = {
-      //   projectId: projectId,
-      // };
+      const deploymentData = await axios.post("http://localhost:9000/deploy", {
+        projectId,
+      });
 
-      // const deploymentData = await axios.post("http://localhost:9000/deploy", deploymentPayload);
+      console.log("deploymentData", deploymentData);
 
-      // if (deploymentData && deploymentData.data) {
-      //   const { deploymentId } = data.data;
-
-      //   console.log(deploymentId);
-      // }
+      if (deploymentData && deploymentData.data) {
+        // console.log("deploymentData.data",deploymentData.data);
+        const { deploymentId } = deploymentData.data.data;
+        setDeploymentId(deploymentId)
+        //createPollingLogs(deploymentId);
+        // console.log("deploymentId",deploymentId);
+      }
     } catch (error) {
       console.error("Error occurred during POST request:", error);
     } finally {
       setLoading(false);
     }
-  }, [projectName, repoURL]);
+  }, [projectId, projectName, repoURL]);
 
-  const handleSocketIncommingMessage = useCallback((message: string) => {
-    console.log(`[Incomming Socket Message]:`, typeof message, message);
-    const { log } = JSON.parse(message);
-    setLogs((prev) => [...prev, log]);
-    logContainerRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  // useEffect(() => {
-  //   socket.on("message", handleSocketIncommingMessage);
-
-  //   return () => {
-  //     socket.off("message", handleSocketIncommingMessage);
-  //   };
-  // }, [handleSocketIncommingMessage]);
+  // const handleSocketIncommingMessage = useCallback((message: string) => {
+  //   console.log(`[Incomming Socket Message]:`, typeof message, message);
+  //   const { log } = JSON.parse(message);
+  //   setLogs((prev) => [...prev, log]);
+  //   logContainerRef.current?.scrollIntoView({ behavior: "smooth" });
+  // }, []);
 
   return (
     <main className="flex justify-center items-center h-[100vh]">

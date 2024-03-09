@@ -17,29 +17,29 @@ const PORT = 9000;
 
 const prisma = new PrismaClient({});
 
-// const kafka = new Kafka({
-//   clientId: `api-server`,
-//   brokers: ["kafka-30cb6532-formhub.a.aivencloud.com:26879"],
-//   ssl: {
-//     ca: [fs.readFileSync(path.join(__dirname, "kafka.pem"), "utf-8")],
-//   },
-//   sasl: {
-//     username: "avnadmin",
-//     password: process.env.KAFKA_PASS,
-//     mechanism: "plain",
-//   },
-// });
+const kafka = new Kafka({
+  clientId: `api-server`,
+  brokers: ["kafka-30cb6532-formhub.a.aivencloud.com:26879"],
+  ssl: {
+    ca: [fs.readFileSync(path.join(__dirname, "kafka.pem"), "utf-8")],
+  },
+  sasl: {
+    username: "avnadmin",
+    password: process.env.KAFKA_PASS,
+    mechanism: "plain",
+  },
+});
 
-// const client = createClient({
-//   host: "https://clickhouse-d4a70f6-formhub.a.aivencloud.com:26867",
-//   database: "default",
-//   username: "avnadmin",
-//   password: process.env.CLICKHOUSE_PASS,
-// });
+const client = createClient({
+  host: "https://clickhouse-d4a70f6-formhub.a.aivencloud.com:26867",
+  database: "default",
+  username: "avnadmin",
+  password: process.env.CLICKHOUSE_PASS,
+});
 
-// const consumer = kafka.consumer({
-//   groupId: "api-server-logs-consumer",
-// });
+const consumer = kafka.consumer({
+  groupId: "api-server-logs-consumer",
+});
 
 const ecsClient = new ECSClient({
   region: "ap-south-1",
@@ -95,13 +95,13 @@ app.post("/project", async (req, res) => {
 app.post("/deploy", async (req, res) => {
   const { projectId } = req.body;
 
-  const project = await prisma.project.findUnique({
+  const project = await prisma.project.findFirst({
     where: {
       id: projectId,
     },
   });
 
-  if (!project) {
+  if (!project) { 
     return res.status(404).json({
       error: "Project not found",
     });
@@ -109,7 +109,7 @@ app.post("/deploy", async (req, res) => {
 
   const deployment = await prisma.deployment.create({
     data: {
-      project: { connect: { id: projectId } },
+      project: { connect: { id: project.id } },
       status: "QUEUED",
     },
   });
@@ -136,7 +136,7 @@ app.post("/deploy", async (req, res) => {
           name: "build-server-image",
           environment: [
             { name: "GIT_REPOSITORY_URL", value: project.gitUrl },
-            { name: "PROJECT_ID", value: projectId },
+            { name: "PROJECT_ID", value: project.id },
             { name: "DEPLOYMENT_ID", value: deployment.id },
           ],
         },
@@ -210,7 +210,7 @@ async function initKafkaConsumer() {
   });
 }
 
-//initKafkaConsumer();
+initKafkaConsumer();
 
 app.listen(PORT, () => {
   console.log(`api server listening on ${PORT}`);
